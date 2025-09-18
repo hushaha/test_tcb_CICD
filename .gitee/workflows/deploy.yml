@@ -1,0 +1,49 @@
+# Gitee Actions 配置文件
+# 部署到腾讯云CloudBase静态托管
+
+name: Deploy to CloudBase Static Hosting
+
+on:
+  push:
+    branches:
+      - main # 主分支推送时触发
+  pull_request:
+    branches:
+      - main # PR时触发（可选）
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+        
+      - name: 设置 Node.js 环境
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm' # 启用npm缓存加速构建
+          
+      - name: 安装依赖
+        run: npm ci # 使用npm ci替代npm install，更适合CI环境
+        
+      - name: 构建项目
+        run: npm run build
+        
+      - name: 安装 CloudBase CLI
+        run: npm install -g @cloudbase/cli
+        
+      - name: 登录 CloudBase CLI
+        run: tcb login --apiKeyId ${{ secrets.TCB_SECRET_ID }} --apiKey ${{ secrets.TCB_SECRET_KEY }}
+        
+      - name: 部署到 CloudBase 静态托管
+        run: tcb hosting deploy ./dist /home -e ${{ secrets.TCB_ENV_ID }}
+        
+      - name: 部署成功通知
+        if: success()
+        run: echo "🎉 部署成功！项目已发布到 CloudBase 静态托管"
+        
+      - name: 部署失败通知
+        if: failure()
+        run: echo "❌ 部署失败，请检查配置和日志"

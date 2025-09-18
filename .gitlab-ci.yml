@@ -1,0 +1,58 @@
+# GitLab CI/CD 配置文件
+# 部署到腾讯云CloudBase静态托管
+
+stages:
+  - build
+  - deploy
+
+variables:
+  NODE_VERSION: "18"
+  CACHE_KEY: "$CI_COMMIT_REF_SLUG-$CI_PROJECT_DIR"
+
+# 缓存配置
+cache:
+  key: ${CACHE_KEY}
+  paths:
+    - node_modules/
+    - .npm/
+
+build:
+  stage: build
+  image: node:18-alpine
+  before_script:
+    - npm config set cache .npm
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+  only:
+    - main
+    - merge_requests
+
+deploy:
+  stage: deploy
+  image: node:18-alpine
+  dependencies:
+    - build
+  before_script:
+    - npm install -g @cloudbase/cli
+  script:
+    - tcb login --apiKeyId $TCB_SECRET_ID --apiKey $TCB_SECRET_KEY
+    - tcb hosting deploy ./dist /home -e $TCB_ENV_ID
+  only:
+    - main
+  when: on_success
+
+# 仅在主分支推送时部署
+deploy_production:
+  extends: deploy
+  environment:
+    name: production
+    url: https://your-domain.com
+  only:
+    - main
+  except:
+    - merge_requests
